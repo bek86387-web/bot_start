@@ -9,7 +9,7 @@ bot = telebot.TeleBot(TOKEN)
 def get_trading_signal(symbol):
     try:
         # Ma'lumotlarni yuklash (15 minutlik va 1 kunlik)
-        df = yf.download(symbol, interval='15m', period='2d', progress=False)
+        df = yf.download(symbol, interval='15m', period='h1', progress=False)
         if df.empty: return None
 
         curr_price = df['Close'].iloc[-1]
