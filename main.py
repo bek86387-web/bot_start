@@ -6,7 +6,7 @@ import feedparser
 from io import BytesIO
 
 # --- BOT SOZLAMALARI ---
-TOKEN = '8568851239:AAGocCorWsn-qR1aSxMHuYd3X9f0PPGj2O8'
+TOKEN = '8568851239:AAHSva3qh2eo59ltfGVGaBSb4t8gLK-XgVI'
 bot = telebot.TeleBot(TOKEN)
 CREATOR = "Ozodbek Yusupov"
 
