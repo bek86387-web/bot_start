@@ -3,7 +3,7 @@ import yfinance as yf
 import pandas as pd
 import time
 
-TOKEN = '8568851239:AAGPcoTEWl0zdlU2grRqUE1cgl1Deckkqr4'
+TOKEN = '8568851239:AAGocCorWsn-qR1aSxMHuYd3X9f0PPGj2O8'
 bot = telebot.TeleBot(TOKEN)
 
 def get_trading_signal(symbol):
