@@ -1,6 +1,7 @@
 import telebot
 import yfinance as yf
-import pandas_ta as ta
+from ta.momentum import RSIIndicator
+from ta.trend import MACD
 import matplotlib.pyplot as plt
 import time
 from io import BytesIO
@@ -15,7 +16,7 @@ SYMBOLS = ['EURUSD=X', 'GBPUSD=X', 'BTC-USD', 'GC=F', 'AAPL', 'TSLA', 'XAUUSD=X'
 @bot.message_handler(commands=['start'])
 def start(message):
     users.add(message.chat.id)
-    text = "Xush kelibsiz Magnumga!\n\nBot yaratuvchisi: **Yusupov Ozodbek**\n\nSignallar avtomatik ravishda yuboriladi."
+    text = "Xush kelibsiz Magnumga!\n\nBot yaratuvchisi: **Yusupov Ozodbek**\n\nSignallar tahlil qilinmoqda..."
     bot.send_message(message.chat.id, text, parse_mode="Markdown")
 
 def check_markets():
@@ -23,18 +24,22 @@ def check_markets():
         for symbol in SYMBOLS:
             try:
                 df = yf.download(symbol, interval='15m', period='2d', progress=False)
-                if df.empty: continue
+                if df.empty or len(df) < 30: continue
                 
-                df['RSI'] = ta.rsi(df['Close'], length=14)
-                macd = ta.macd(df['Close'])
-                df = df.join(macd)
+                # RSI va MACD hisoblash
+                rsi_series = RSIIndicator(close=df['Close'], window=14).rsi()
+                macd_obj = MACD(close=df['Close'])
+                macd_line = macd_obj.macd()
+                macd_signal_line = macd_obj.macd_signal()
                 
-                last = df.iloc[-1]
+                last_rsi = rsi_series.iloc[-1]
+                last_macd = macd_line.iloc[-1]
+                last_signal = macd_signal_line.iloc[-1]
                 
                 signal = None
-                if last['RSI'] < 32 and last['MACD_12_26_9'] > last['MACDs_12_26_9']:
+                if last_rsi < 32 and last_macd > last_signal:
                     signal = 'BUY 🟢'
-                elif last['RSI'] > 68 and last['MACD_12_26_9'] < last['MACDs_12_26_9']:
+                elif last_rsi > 68 and last_macd < last_signal:
                     signal = 'SELL 🔴'
                 
                 if signal:
@@ -47,10 +52,13 @@ def check_markets():
                     buf.seek(0)
                     plt.close()
                     
-                    for user_id in users:
-                        bot.send_photo(user_id, buf, caption=f"🚀 KUCHLI SIGNAL!\n\nInstrument: {symbol}\nYo'nalish: {signal}\n\nYaratuvchi: Yusupov Ozodbek")
+                    for user_id in list(users):
+                        try:
+                            bot.send_photo(user_id, buf, caption=f"🚀 KUCHLI SIGNAL!\n\nInstrument: {symbol}\nYo'nalish: {signal}\n\nYaratuvchi: Yusupov Ozodbek")
+                        except: pass
                     buf.close()
-            except:
+            except Exception as e:
+                print(f"Xato: {e}")
                 continue
         time.sleep(300)
 
