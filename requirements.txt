@@ -1,6 +1,6 @@
 pyTelegramBotAPI
 yfinance
-mplfinance
-matplotlib
+pandas
 feedparser
+
 
