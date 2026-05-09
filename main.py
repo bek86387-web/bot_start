@@ -1,67 +1,55 @@
 import telebot
 import yfinance as yf
-from ta.momentum import RSIIndicator
-from ta.trend import MACD
 import matplotlib.pyplot as plt
 import time
 from io import BytesIO
-import threading
 
 TOKEN = '8568851239:AAFt-9KMGOkncby0lnr1vG-D8lqJISdyZV0'
 bot = telebot.TeleBot(TOKEN)
-users = set()
 
-SYMBOLS = ['EURUSD=X', 'GBPUSD=X', 'BTC-USD', 'GC=F', 'AAPL', 'TSLA', 'XAUUSD=X']
+# Kuzatiladigan bozorlar
+SYMBOLS = {'Oltin': 'GC=F', 'Bitcoin': 'BTC-USD', 'EUR/USD': 'EURUSD=X', 'Tesla': 'TSLA'}
 
 @bot.message_handler(commands=['start'])
 def start(message):
-    users.add(message.chat.id)
-    text = "Xush kelibsiz Magnumga!\n\nBot yaratuvchisi: **Yusupov Ozodbek**\n\nSignallar tahlil qilinmoqda..."
-    bot.send_message(message.chat.id, text, parse_mode="Markdown")
+    markup = telebot.types.ReplyKeyboardMarkup(resize_keyboard=True)
+    for name in SYMBOLS.keys():
+        markup.add(telebot.types.KeyboardButton(name))
+    bot.send_message(message.chat.id, "Xush kelibsiz Magnumga!\nInstrumentni tanlang:", reply_markup=markup)
 
-def check_markets():
-    while True:
-        for symbol in SYMBOLS:
-            try:
-                df = yf.download(symbol, interval='15m', period='2d', progress=False)
-                if df.empty or len(df) < 30: continue
-                
-                # RSI va MACD hisoblash
-                rsi_series = RSIIndicator(close=df['Close'], window=14).rsi()
-                macd_obj = MACD(close=df['Close'])
-                macd_line = macd_obj.macd()
-                macd_signal_line = macd_obj.macd_signal()
-                
-                last_rsi = rsi_series.iloc[-1]
-                last_macd = macd_line.iloc[-1]
-                last_signal = macd_signal_line.iloc[-1]
-                
-                signal = None
-                if last_rsi < 32 and last_macd > last_signal:
-                    signal = 'BUY 🟢'
-                elif last_rsi > 68 and last_macd < last_signal:
-                    signal = 'SELL 🔴'
-                
-                if signal:
-                    plt.figure(figsize=(10, 5))
-                    plt.plot(df.index[-40:], df['Close'][-40:], color='blue', label='Price')
-                    plt.title(f"{symbol} - {signal}")
-                    plt.grid(True)
-                    buf = BytesIO()
-                    plt.savefig(buf, format='png')
-                    buf.seek(0)
-                    plt.close()
-                    
-                    for user_id in list(users):
-                        try:
-                            bot.send_photo(user_id, buf, caption=f"🚀 KUCHLI SIGNAL!\n\nInstrument: {symbol}\nYo'nalish: {signal}\n\nYaratuvchi: Yusupov Ozodbek")
-                        except: pass
-                    buf.close()
-            except Exception as e:
-                print(f"Xato: {e}")
-                continue
-        time.sleep(300)
+@bot.message_handler(func=lambda message: message.text in SYMBOLS.keys())
+def send_analysis(message):
+    symbol = SYMBOLS[message.text]
+    df = yf.download(symbol, interval='15m', period='2d', progress=False)
+    
+    if df.empty:
+        bot.reply_to(message, "Ma'lumot topilmadi.")
+        return
+
+    current_price = df['Close'].iloc[-1]
+    support = df['Low'].tail(20).min()   # Oxirgi 20 sham ichidagi eng past nuqta
+    resistance = df['High'].tail(20).max() # Oxirgi 20 sham ichidagi eng yuqori nuqta
+
+    # Grafik chizish
+    plt.figure(figsize=(10, 6))
+    plt.plot(df.index, df['Close'], color='blue', label='Narx')
+    plt.axhline(y=support, color='green', linestyle='--', label='Support (Pastki daraja)')
+    plt.axhline(y=resistance, color='red', linestyle='--', label='Resistance (Yuqori daraja)')
+    plt.title(f"{message.text} Jonli Grafik")
+    plt.legend()
+    
+    buf = BytesIO()
+    plt.savefig(buf, format='png')
+    buf.seek(0)
+    plt.close()
+
+    caption = (f"📊 **{message.text}**\n\n"
+               f"💰 Joriy narx: {current_price:.2f}\n"
+               f"📉 Kuchli pastki daraja: {support:.2f}\n"
+               f"📈 Kuchli yuqori daraja: {resistance:.2f}\n\n"
+               f"Yaratuvchi: Yusupov Ozodbek")
+    
+    bot.send_photo(message.chat.id, buf, caption=caption, parse_mode="Markdown")
 
 if __name__ == "__main__":
-    threading.Thread(target=check_markets, daemon=True).start()
     bot.polling(none_stop=True)
