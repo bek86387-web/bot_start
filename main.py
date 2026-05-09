@@ -110,4 +110,44 @@ def show_news(message):
             f"⚠️ *Eslatma:* Yangiliklar paytida bozor keskin o'zgarishi mumkin!\n\n"
             f"👤 **Yaratuvchi:** Ozodbek Yusupov")
     bot.send_message(message.chat.id, text, parse_mode="Markdown")
+@bot.message_handler(commands=['stats'])
+def market_stats(message):
+    """Bozorning umumiy texnik holati"""
+    bot.send_message(message.chat.id, "📊 Global bozor ko'rsatkichlari hisoblanmoqda...")
+    try:
+        # Bitcoin Dominansini hisoblash (taxminiy)
+        btc = yf.Ticker("BTC-USD").history(period="1d")['Close'].iloc[-1]
+        
+        text = (f"📈 **BOZOR STATISTIKASI**\n\n"
+                f"🪙 **BTC Narxi:** ${btc:,.2f}\n"
+                f"🕒 **Vaqt:** {time.strftime('%H:%M:%S')}\n"
+                f"💹 **Bozor holati:** Tahliliy ma'lumotlar yangilanmoqda...\n\n"
+                f"💡 *Maslahat:* `/top` komandasi orqali eng faol harakatlarni ko'rishingiz mumkin.\n\n"
+                f"👤 **Yaratuvchi:** Ozodbek Yusupov")
+        bot.send_message(message.chat.id, text, parse_mode="Markdown")
+    except:
+        bot.send_message(message.chat.id, "⚠️ Ma'lumot olishda xatolik.")
+
+@bot.message_handler(commands=['info'])
+def get_detailed_info(message):
+    """Foydalanuvchidan para nomini so'raydi va to'liq ma'lumot beradi"""
+    msg = bot.reply_to(message, "Qaysi para haqida ma'lumot kerak? (Masalan: `AAPL` yoki `BTC-USD`)", parse_mode="Markdown")
+    bot.register_next_step_handler(msg, process_info_step)
+
+def process_info_step(message):
+    symbol = message.text.upper().strip()
+    try:
+        ticker = yf.Ticker(symbol)
+        info = ticker.fast_info
+        
+        detail_text = (f"ℹ️ **{symbol} BATAFSIL MA'LUMOT**\n\n"
+                       f"💰 **Oxirgi narx:** {info['last_price']:.2f}\n"
+                       f"📏 **Kunlik diapazon:** {info['day_low']:.2f} - {info['day_high']:.2f}\n"
+                       f"📊 **Hajm (Volume):** {info['last_volume']:,.0f}\n"
+                       f"📅 **52 haftalik max:** {info['year_high']:.2f}\n"
+                       f"📅 **52 haftalik min:** {info['year_low']:.2f}\n\n"
+                       f"👤 **Yaratuvchi:** Ozodbek Yusupov")
+        bot.send_message(message.chat.id, detail_text, parse_mode="Markdown")
+    except:
+        bot.send_message(message.chat.id, "❌ Ma'lumot topilmadi. Tiker to'g'ri ekanligini tekshiring.")
 
