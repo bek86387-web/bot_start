@@ -1,4 +1,5 @@
 pyTelegramBotAPI
 yfinance
-pandas-ta
+ta
 matplotlib
+
