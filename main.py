@@ -81,3 +81,33 @@ def manual_analyze(message):
 
 if __name__ == "__main__":
     bot.polling(none_stop=True)
+    import feedparser # pip install feedparser
+
+def get_economic_calendar():
+    """ForexFactory yoki shunga o'xshash manbadan muhim yangiliklarni oladi"""
+    try:
+        # ForexFactory iqtisodiy taqvimi (RSS formatida)
+        url = "https://forexfactory.com"
+        feed = feedparser.parse(url)
+        
+        news_list = []
+        for entry in feed.entries[:5]: # Eng yaqin 5 ta yangilik
+            news_list.append(f"📅 {entry.title} ({entry.updated})")
+            
+        if not news_list:
+            return "Bugun muhim iqtisodiy yangiliklar topilmadi."
+        
+        return "\n".join(news_list)
+    except:
+        return "Yangiliklarni yuklab olishda xatolik yuz berdi."
+
+# Start yoki Signal xabariga qo'shish uchun namuna:
+@bot.message_handler(commands=['news'])
+def show_news(message):
+    bot.send_message(message.chat.id, "🔍 Yaqin soatlardagi muhim yangiliklar tahlil qilinmoqda...")
+    news = get_economic_calendar()
+    text = (f"📢 **IQTISODIY TAQVIM**\n\n{news}\n\n"
+            f"⚠️ *Eslatma:* Yangiliklar paytida bozor keskin o'zgarishi mumkin!\n\n"
+            f"👤 **Yaratuvchi:** Ozodbek Yusupov")
+    bot.send_message(message.chat.id, text, parse_mode="Markdown")
+
