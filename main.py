@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from io import BytesIO
 
-TOKEN = '8568851239:AAFt-9KMGOkncby0lnr1vG-D8lqJISdyZV0'
+TOKEN = '8568851239:AAGPcoTEWl0zdlU2grRqUE1cgl1Deckkqr4'
 bot = telebot.TeleBot(TOKEN)
 
 @bot.message_handler(commands=['start'])
