@@ -1,55 +1,86 @@
 import telebot
 import yfinance as yf
 import matplotlib.pyplot as plt
-import time
+import numpy as np
 from io import BytesIO
 
 TOKEN = '8568851239:AAFt-9KMGOkncby0lnr1vG-D8lqJISdyZV0'
 bot = telebot.TeleBot(TOKEN)
 
-# Kuzatiladigan bozorlar
-SYMBOLS = {'Oltin': 'GC=F', 'Bitcoin': 'BTC-USD', 'EUR/USD': 'EURUSD=X', 'Tesla': 'TSLA'}
-
 @bot.message_handler(commands=['start'])
 def start(message):
-    markup = telebot.types.ReplyKeyboardMarkup(resize_keyboard=True)
-    for name in SYMBOLS.keys():
-        markup.add(telebot.types.KeyboardButton(name))
-    bot.send_message(message.chat.id, "Xush kelibsiz Magnumga!\nInstrumentni tanlang:", reply_markup=markup)
+    text = (f"Xush kelibsiz Magnumga!\n\n"
+            f"👤 **Bot yaratuvchisi:** Ozodbek Yusupov\n\n"
+            f"Istalgan valyuta, aksiya yoki kriptovalyuta nomini yozing.\n"
+            f"Masalan: `BTC-USD`, `EURUSD=X`, `GC=F` (Oltin), `AAPL`.")
+    bot.send_message(message.chat.id, text, parse_mode="Markdown")
 
-@bot.message_handler(func=lambda message: message.text in SYMBOLS.keys())
-def send_analysis(message):
-    symbol = SYMBOLS[message.text]
-    df = yf.download(symbol, interval='15m', period='2d', progress=False)
+@bot.message_handler(func=lambda message: True)
+def analyze_market(message):
+    symbol = message.text.upper()
+    # Yahoo Finance formatiga moslash (agar foydalanuvchi oddiy yozsa)
+    if len(symbol) == 6 and "=" not in symbol:
+        symbol = f"{symbol}=X"
     
-    if df.empty:
-        bot.reply_to(message, "Ma'lumot topilmadi.")
-        return
+    try:
+        sent_msg = bot.reply_to(message, "📊 Ma'lumotlar tahlil qilinmoqda...")
+        df = yf.download(symbol, interval='15m', period='5d', progress=False)
+        
+        if df.empty:
+            bot.edit_message_text("❌ Bunday belgi topilmadi. To'g'ri yozganingizga ishonch hosil qiling.", message.chat.id, sent_msg.message_id)
+            return
 
-    current_price = df['Close'].iloc[-1]
-    support = df['Low'].tail(20).min()   # Oxirgi 20 sham ichidagi eng past nuqta
-    resistance = df['High'].tail(20).max() # Oxirgi 20 sham ichidagi eng yuqori nuqta
+        # 1. Narx va darajalar
+        current_price = df['Close'].iloc[-1]
+        high_max = df['High'].max()
+        low_min = df['Low'].min()
+        
+        # 2. Narx qaytish zonalari (Supply & Demand)
+        demand_zone = df['Low'].tail(50).min()
+        supply_zone = df['High'].tail(50).max()
 
-    # Grafik chizish
-    plt.figure(figsize=(10, 6))
-    plt.plot(df.index, df['Close'], color='blue', label='Narx')
-    plt.axhline(y=support, color='green', linestyle='--', label='Support (Pastki daraja)')
-    plt.axhline(y=resistance, color='red', linestyle='--', label='Resistance (Yuqori daraja)')
-    plt.title(f"{message.text} Jonli Grafik")
-    plt.legend()
-    
-    buf = BytesIO()
-    plt.savefig(buf, format='png')
-    buf.seek(0)
-    plt.close()
+        # 3. Gann burchaklari (Soddalashtirilgan matematik model)
+        # Gann nazariyasi bo'yicha narx o'zgarishi vaqtga nisbatan olinadi
+        x = np.arange(len(df))
+        y = df['Close'].values
+        start_price = df['Low'].min()
+        gann_1x1 = start_price + (x * (df['Close'].std() / 100)) # 45 daraja
 
-    caption = (f"📊 **{message.text}**\n\n"
-               f"💰 Joriy narx: {current_price:.2f}\n"
-               f"📉 Kuchli pastki daraja: {support:.2f}\n"
-               f"📈 Kuchli yuqori daraja: {resistance:.2f}\n\n"
-               f"Yaratuvchi: Yusupov Ozodbek")
-    
-    bot.send_photo(message.chat.id, buf, caption=caption, parse_mode="Markdown")
+        # Grafik chizish
+        plt.figure(figsize=(12, 7))
+        plt.plot(df.index, df['Close'], color='#1f77b4', label='Joriy Narx', linewidth=2)
+        
+        # Darajalar
+        plt.axhline(y=supply_zone, color='red', linestyle='--', alpha=0.6, label='Supply Zone (Qarshilik)')
+        plt.axhline(y=demand_zone, color='green', linestyle='--', alpha=0.6, label='Demand Zone (Qo\'llab-quvvatlash)')
+        
+        # Gann Line
+        plt.plot(df.index, gann_1x1, color='orange', linestyle=':', label='Gann 1x1 burchagi')
+        
+        plt.title(f"{symbol} - Professional Tahlil", fontsize=14)
+        plt.grid(True, alpha=0.3)
+        plt.legend()
+        
+        buf = BytesIO()
+        plt.savefig(buf, format='png', dpi=150)
+        buf.seek(0)
+        plt.close()
+
+        caption = (f"💎 **{symbol} ANALIZI**\n\n"
+                   f"💰 **Joriy narx:** {current_price:.4f}\n"
+                   f"📈 **Maksimal (5 kunlik):** {high_max:.4f}\n"
+                   f"📉 **Minimal (5 kunlik):** {low_min:.4f}\n\n"
+                   f"🎯 **Qaytish zonalari:**\n"
+                   f"🔴 Supply: {supply_zone:.4f}\n"
+                   f"🟢 Demand: {demand_zone:.4f}\n\n"
+                   f"📐 **Gann 1x1:** Narx burchakdan {('tepada' if current_price > gann_1x1[-1] else 'pastda')}\n\n"
+                   f"👤 **Yaratuvchi:** Ozodbek Yusupov")
+        
+        bot.delete_message(message.chat.id, sent_msg.message_id)
+        bot.send_photo(message.chat.id, buf, caption=caption, parse_mode="Markdown")
+
+    except Exception as e:
+        bot.send_message(message.chat.id, f"Xato yuz berdi: {str(e)}")
 
 if __name__ == "__main__":
     bot.polling(none_stop=True)
